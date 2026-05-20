@@ -7,28 +7,54 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
+
+const loginSchema = z.object({
+  username: z.string().email('Please enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: '',
+      password: '',
+    },
+  });
+
+  const onSubmit = async (data: LoginFormValues) => {
     setIsLoading(true);
     setError('');
 
     try {
-      const formData = new FormData();
-      formData.append('username', email);
-      formData.append('password', password);
-
-      const res = await api.post('/auth/login', formData);
-      login(res.data.access_token);
-    } catch {
-      setError('Invalid email or password');
+      await api.post('/auth/login', {
+        username: data.username,
+        password: data.password,
+      });
+      // Backend sets HttpOnly cookie; refresh auth state.
+      login();
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setError('Invalid email or password');
+      } else if (err.response?.data?.message) {
+        setError(Array.isArray(err.response.data.message) ? err.response.data.message.join(', ') : err.response.data.message);
+      } else {
+        setError('An error occurred during login');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -45,29 +71,27 @@ export default function LoginPage() {
           <CardDescription className="text-slate-500">B.K. Birla College (Autonomous)</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="username">Email Address</Label>
               <Input
-                id="email"
+                id="username"
                 type="email"
                 placeholder="faculty@bkbirlacollege.edu"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
                 className="bg-slate-50 border-slate-200"
+                {...register('username')}
               />
+              {errors.username && <p className="text-sm text-red-600">{errors.username.message}</p>}
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
                 className="bg-slate-50 border-slate-200"
+                {...register('password')}
               />
+              {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
             </div>
             {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded border border-red-200">{error}</p>}
             <Button
@@ -77,6 +101,13 @@ export default function LoginPage() {
             >
               {isLoading ? 'Authenticating...' : 'Sign In securely'}
             </Button>
+            
+            <div className="text-center mt-4 text-sm text-slate-600">
+              Don't have an account?{' '}
+              <Link href="/register" className="text-blue-800 hover:underline font-medium">
+                Register here
+              </Link>
+            </div>
           </form>
         </CardContent>
         <CardFooter className="justify-center text-xs text-slate-500 border-t border-slate-100 pt-4">

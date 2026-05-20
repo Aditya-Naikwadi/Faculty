@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 
 interface User {
-  id: number;
+  id: string; // UUID from backend
   email: string;
   name: string;
   role: string;
@@ -16,7 +16,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (token: string) => void;
+  login: () => void; // No token argument – token is HttpOnly cookie
   logout: () => void;
 }
 
@@ -44,23 +44,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    const token = Cookies.get('token');
-    if (token) {
-      // eslint-disable-next-line
-      fetchUser();
-    } else {
-      setTimeout(() => setLoading(false), 0);
-    }
+    fetchUser();
   }, []);
 
-  const login = (token: string) => {
-    Cookies.set('token', token, { expires: 7 });
+  const login = () => {
+    // After successful login, backend sets HttpOnly cookie. Refresh user state.
     fetchUser();
     router.push('/');
   };
 
-  const logout = () => {
-    Cookies.remove('token');
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (err) {
+      console.error('Failed to log out cleanly on backend', err);
+    }
     setUser(null);
     router.push('/login');
   };
