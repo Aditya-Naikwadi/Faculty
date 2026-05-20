@@ -44,7 +44,9 @@ export default function Dashboard() {
     if (!loading && !user) {
       router.push('/login');
     } else if (user) {
-      fetchAppraisals();
+      setTimeout(() => {
+        fetchAppraisals();
+      }, 0);
     }
   }, [user, loading, router, fetchAppraisals]);
 
